@@ -25,8 +25,12 @@ export function StockSearch() {
 
   // GSAP animation on mount
   useEffect(() => {
-    if (typeof window !== "undefined" && window.gsap && formRef.current) {
-      window.gsap.from(formRef.current, {
+    if (
+      typeof window !== "undefined" &&
+      (window as any).gsap &&
+      formRef.current
+    ) {
+      (window as any).gsap.from(formRef.current, {
         y: 30,
         opacity: 0,
         duration: 0.8,
