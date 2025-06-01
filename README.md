@@ -1,5 +1,16 @@
 # Stock Signal AI by Aditya Jadhav
 
+Stock Signal AI fetches real-time news feeds, analyzes them using advanced AI models (DeepSeek/DeepRouter), and provides you with a buy, sell, or hold signal for any stock depending on the latest news sentiment and facts.
+
+**How it works:** Stock Signal AI continuously gathers the latest news articles and financial reports about your chosen stock. It then sends this information to state-of-the-art AI models (DeepSeek/DeepRouter) that are specifically tuned for financial analysis. The AI reviews the news, fact-checks claims, and determines the likely impact on the stock price. Based on this, it gives you a clear, actionable signal: **Buy**, **Sell**, or **Hold**.
+
+**What makes this unique?**
+- **AI-Driven, Not Just Data-Driven:** Unlike traditional stock screeners that rely only on historical price data or basic sentiment, Stock Signal AI uses advanced language models to understand the context, tone, and facts in real news articles.
+- **Fact-Checking:** The system doesn't just summarize news—it verifies claims and highlights which information is certain and which is speculative, giving you more confidence in the signals.
+- **Real-Time, News-Based Signals:** Instead of waiting for end-of-day or delayed data, you get insights as soon as news breaks, helping you act faster than the market.
+- **No Hardcoded Rules:** The AI adapts to new events, trends, and language, so it can catch signals that rule-based systems miss.
+- **Privacy & Security:** Your API keys and sensitive data are never exposed or committed to the codebase.
+
 AI-powered stock insights and predictions using live news and advanced algorithms.
 
 ## Features
