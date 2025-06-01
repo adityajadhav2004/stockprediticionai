@@ -83,7 +83,9 @@ export function StockSearch() {
       // Step 4: Generating recommendations
       setCurrentStep(4)
 
-      const response = await fetch(`/api/stock-insight?stock=${encodeURIComponent(stockName)}`)
+      // Always send stockName in lowercase to the API for case-insensitive search
+      const normalizedStockName = stockName.trim().toLowerCase()
+      const response = await fetch(`/api/stock-insight?stock=${encodeURIComponent(normalizedStockName)}`)
 
       if (!response.ok) {
         throw new Error(`Error: ${response.status}`)
@@ -101,9 +103,9 @@ export function StockSearch() {
         description: "There was an error fetching stock insights. Please try again.",
         variant: "destructive",
       })
-      setCurrentStep(0) // Reset progress
     } finally {
       setIsLoading(false)
+      setCurrentStep(0) // Reset progress
     }
   }
 
