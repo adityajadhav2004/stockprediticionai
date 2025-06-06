@@ -91,10 +91,12 @@ MIT
 
 ## Recent Updates (June 2025)
 
-- **Full Stock Universe Search:** The search bar now uses the complete NASDAQ and NSE stock lists (from CSVs) for validation, typo correction, and suggestions. Any real stock name or ticker is recognized.
-- **Fuzzy Matching at Scale:** Typo correction and suggestions work for all stocks, not just a hardcoded list.
-- **Performance Optimized:** Stock list is loaded and memoized efficiently for fast search and suggestions.
-- **User-Friendly No News Handling:** If you search for a valid stock but there is no current news, the app now displays a clear message: "No current news found for this stock." instead of a generic error.
+- **Exchange Dropdown:** You can now select between NSE and NASDAQ stocks directly in the search bar for more accurate results and suggestions.
+- **Response Method Selection:** Choose between OpenRouter AI and Serper (Google) as the response provider, blended into the search bar for convenience.
+- **Robust AI Fallback:** If OpenRouter/DeepSeek cannot provide a summary, the backend will automatically try Serper (Google) to ensure you always get a real, fact-based summary for any valid stock.
+- **Terminal Logging:** The backend logs which AI or API (OpenRouter, Serper) provided the response for each request.
+- **Input Trimming:** Extra spaces in stock names are automatically removed before processing.
+- **Security:** API keys (including Serper) are never pushed to the repo and must be set in `.env.local` (which is gitignored).
 - **Bug Fixes:** Prevented runtime errors when no news is found by providing safe defaults for all result fields.
 
 For any issues, contact [Aditya Jadhav](https://www.linkedin.com/in/aditya-jadhav-coder/).
