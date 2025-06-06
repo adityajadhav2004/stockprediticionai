@@ -12,20 +12,24 @@ const outputPath = path.join(__dirname, '../public/all_stocks.json');
 
 function parseNasdaq(csv) {
   const records = parse(csv, { columns: true, skip_empty_lines: true });
-  return records.map(r => ({
-    name: r['Security Name']?.replace(/\s*-\s*Common Stock.*/, '')?.trim(),
-    symbol: r['Symbol']?.trim(),
-    exchange: 'NASDAQ',
-  })).filter(r => r.name && r.symbol);
+  return records
+    .map(r => ({
+      name: r['Security Name']?.replace(/\s*-\s*Common Stock.*/, '')?.trim(),
+      symbol: r['Symbol']?.trim(),
+      exchange: 'NASDAQ',
+    }))
+    .filter(r => r.name && r.symbol && r.name.length > 1 && r.symbol.length > 0);
 }
 
 function parseNse(csv) {
   const records = parse(csv, { columns: true, skip_empty_lines: true });
-  return records.map(r => ({
-    name: r['NAME OF COMPANY']?.trim(),
-    symbol: r['SYMBOL']?.trim(),
-    exchange: 'NSE',
-  })).filter(r => r.name && r.symbol);
+  return records
+    .map(r => ({
+      name: r['NAME OF COMPANY']?.trim(),
+      symbol: r['SYMBOL']?.trim(),
+      exchange: 'NSE',
+    }))
+    .filter(r => r.name && r.symbol && r.name.length > 1 && r.symbol.length > 0);
 }
 
 const nasdaqCsv = fs.readFileSync(nasdaqPath, 'utf8');

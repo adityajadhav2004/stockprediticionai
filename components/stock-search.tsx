@@ -20,13 +20,14 @@ interface StockEntry {
 }
 
 export function StockSearch() {
-  const [stockName, setStockName] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [results, setResults] = useState<StockInsight | null>(null)
-  const [currentStep, setCurrentStep] = useState(0)
-  const [apiKeysAvailable, setApiKeysAvailable] = useState(true)
-  const [suggestion, setSuggestion] = useState<string | null>(null)
-  const [allStocks, setAllStocks] = useState<StockEntry[]>([])
+  const [stockName, setStockName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [results, setResults] = useState<StockInsight | null>(null);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [apiKeysAvailable, setApiKeysAvailable] = useState(true);
+  const [suggestion, setSuggestion] = useState<string | null>(null);
+  const [allStocks, setAllStocks] = useState<StockEntry[]>([]);
+  const [exchange, setExchange] = useState<'NASDAQ' | 'NSE'>('NSE');
   const { toast } = useToast()
 
   const formRef = useRef<HTMLFormElement>(null)
@@ -75,10 +76,13 @@ export function StockSearch() {
     checkApiKeys()
   }, [])
 
-  // Memoized list of all names and tickers (lowercase for matching)
+  // Memoized list of all names and tickers (lowercase for matching), filtered by exchange
   const stockNamesAndSymbols = useMemo(() => {
-    return allStocks.flatMap((s) => [s.name, s.symbol]).filter(Boolean)
-  }, [allStocks])
+    return allStocks
+      .filter((s) => s.exchange === exchange)
+      .flatMap((s) => [s.name, s.symbol])
+      .filter(Boolean);
+  }, [allStocks, exchange]);
 
   // Levenshtein distance for fuzzy matching
   function levenshtein(a: string, b: string) {
@@ -210,6 +214,20 @@ export function StockSearch() {
 
   return (
     <div className="space-y-6">
+      {/* Exchange Dropdown */}
+      <div className="max-w-xl mx-auto mb-2 flex gap-3 items-center">
+        <label htmlFor="exchange-select" className="font-medium text-sm">Exchange:</label>
+        <select
+          id="exchange-select"
+          value={exchange}
+          onChange={e => setExchange(e.target.value as 'NASDAQ' | 'NSE')}
+          className="border rounded-lg px-3 py-2 bg-background text-foreground"
+        >
+          <option value="NSE">NSE</option>
+          <option value="NASDAQ">NASDAQ</option>
+        </select>
+      </div>
+
       {suggestion && (
         <Alert className="max-w-xl mx-auto mb-2 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
           <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />

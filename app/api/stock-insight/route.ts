@@ -26,11 +26,13 @@ export async function GET(request: NextRequest) {
   try {
     // Get stock name from query parameters
     const searchParams = request.nextUrl.searchParams
-    const stockName = searchParams.get("stock")
+    let stockName = searchParams.get("stock")
 
     if (!stockName) {
       return NextResponse.json({ error: "Stock name is required" }, { status: 400 })
     }
+
+    stockName = stockName.trim();
 
     // Check if we have the required API keys
     const newsApiKey = process.env.NEWS_API_KEY
@@ -46,16 +48,8 @@ export async function GET(request: NextRequest) {
     // Fetch news about the stock with more specific query
     const newsData = await fetchNewsData(stockName)
 
-    if (!newsData || newsData.articles.length === 0) {
-      return NextResponse.json({ error: "No news found for this stock" }, { status: 404 })
-    }
-
     // Filter news to ensure relevance to the stock
     const filteredArticles = filterRelevantNews(newsData.articles, stockName)
-
-    if (filteredArticles.length === 0) {
-      return NextResponse.json({ error: "No relevant news found for this stock" }, { status: 404 })
-    }
 
     // Prepare news for AI analysis
     const newsArticles = filteredArticles.slice(0, 5) // Limit to 5 articles
@@ -73,11 +67,46 @@ URL: ${article.url}
       .join("\n\n")
 
     // Analyze news with OpenRouter
-    const analysisResult = await analyzeNewsWithAI(stockName, formattedNews)
+    let analysisResult, parsedResult, responder = "openrouter";
+    try {
+      analysisResult = await analyzeNewsWithAI(stockName, formattedNews)
+      parsedResult = parseAIResponse(analysisResult)
+    } catch (e) {
+      responder = "openrouter-error"
+      parsedResult = { summary: "Unable to generate summary from AI response", signalType: "Unknown", impact: "Neutral" }
+    }
 
-    // Parse the AI response
-    const parsedResult = parseAIResponse(analysisResult)
-
+    // If summary is missing or generic, try fallbacks
+    if (!parsedResult.summary || parsedResult.summary.includes('Unable to generate summary') || parsedResult.summary.includes('No summary')) {
+      // Try Serper
+      let fallbackSummary = await fetchSerperSummary(stockName);
+      if (fallbackSummary) {
+        responder = "serper";
+      }
+      if (!fallbackSummary) {
+        // Try Alpha Vantage (try symbol if available)
+        const symbol = stockName.toUpperCase();
+        fallbackSummary = await fetchAlphaVantageSummary(symbol);
+        if (fallbackSummary) responder = "alphavantage";
+      }
+      if (!fallbackSummary) {
+        // Try Finnhub
+        const symbol = stockName.toUpperCase();
+        fallbackSummary = await fetchFinnhubSummary(symbol);
+        if (fallbackSummary) responder = "finnhub";
+      }
+      if (fallbackSummary) {
+        parsedResult.summary = fallbackSummary;
+        parsedResult.signalType = 'General Company Info';
+        parsedResult.impact = 'Neutral';
+      } else {
+        parsedResult.summary = 'No data available for this stock at the moment.';
+        parsedResult.signalType = 'Unknown';
+        parsedResult.impact = 'Neutral';
+        responder = "none";
+      }
+    }
+    console.log(`[StockSignalAI] Response provider: ${responder}`);
     // Return the final result with news sources
     return NextResponse.json({
       ...parsedResult,
@@ -88,6 +117,7 @@ URL: ${article.url}
         source: article.source,
         publishedAt: article.publishedAt,
       })),
+      responder,
     })
   } catch (error) {
     console.error("Error processing request:", error)
@@ -189,14 +219,16 @@ async function fetchNewsData(stockName: string): Promise<NewsApiResponse> {
   return response.json()
 }
 
-async function analyzeNewsWithAI(stockName: string, newsContent: string): Promise<string> {
+async function analyzeNewsWithAI(stockName: string, newsContent: string, rawPrompt = false): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY
 
   if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY is not defined")
   }
 
-  const prompt = `You are a financial analyst specializing in stock market analysis. Analyze the following news articles about ${stockName} and predict if there's any signal of the stock moving up or down.
+  const prompt = rawPrompt
+    ? newsContent // Use the provided prompt directly
+    : `You are a financial analyst specializing in stock market analysis. Analyze the following news articles about ${stockName} and predict if there's any signal of the stock moving up or down.
 
 IMPORTANT: ONLY analyze information directly related to ${stockName}. Do NOT include analysis of other companies or general market trends unless they specifically impact ${stockName}.
 
@@ -296,5 +328,48 @@ function parseAIResponse(aiResponse: string): {
       relevanceScore: 0,
     }
   }
+}
+
+// Add fallback helpers
+async function fetchSerperSummary(stockName: string): Promise<string | null> {
+  const apiKey = process.env.SERPER_API_KEY
+  if (!apiKey) return null
+  const res = await fetch("https://google.serper.dev/search", {
+    method: "POST",
+    headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ q: stockName + " company profile" }),
+  })
+  if (!res.ok) return null
+  const data = await res.json()
+  if (data && data.organic && data.organic.length > 0) {
+    return data.organic[0].snippet || data.organic[0].title || null
+  }
+  return null
+}
+
+async function fetchAlphaVantageSummary(symbol: string): Promise<string | null> {
+  const apiKey = process.env.ALPHA_VANTAGE_KEY
+  if (!apiKey) return null
+  const res = await fetch(
+    `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${apiKey}`,
+  )
+  if (!res.ok) return null
+  const data = await res.json()
+  if (data && data.Description) return data.Description
+  return null
+}
+
+async function fetchFinnhubSummary(symbol: string): Promise<string | null> {
+  const apiKey = process.env.FINNHUB_API_KEY
+  if (!apiKey) return null
+  const res = await fetch(
+    `https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${apiKey}`,
+  )
+  if (!res.ok) return null
+  const data = await res.json()
+  if (data && data.name && data.finnhubIndustry) {
+    return `${data.name} operates in the ${data.finnhubIndustry} sector.`
+  }
+  return null
 }
 
