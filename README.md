@@ -74,5 +74,27 @@ Pull requests are welcome! For major changes, open an issue first.
 ## License
 MIT
 
+---
+
+### Publishing Procedure
+1. Ensure `.env.local` is **not** committed (check with `git status`).
+2. Commit your code:
+   ```sh
+   git add .
+   git commit -m "Your message"
+   git push origin main
+   ```
+3. Your code will be published to [https://github.com/adityajadhav2004/stockprediticionai](https://github.com/adityajadhav2004/stockprediticionai)
+4. **Never share your `.env.local` file or API keys.**
+
+---
+
+## Recent Updates (June 2025)
+
+- **Full Stock Universe Search:** The search bar now uses the complete NASDAQ and NSE stock lists (from CSVs) for validation, typo correction, and suggestions. Any real stock name or ticker is recognized.
+- **Fuzzy Matching at Scale:** Typo correction and suggestions work for all stocks, not just a hardcoded list.
+- **Performance Optimized:** Stock list is loaded and memoized efficiently for fast search and suggestions.
+- **User-Friendly No News Handling:** If you search for a valid stock but there is no current news, the app now displays a clear message: "No current news found for this stock." instead of a generic error.
+- **Bug Fixes:** Prevented runtime errors when no news is found by providing safe defaults for all result fields.
 
 For any issues, contact [Aditya Jadhav](https://www.linkedin.com/in/aditya-jadhav-coder/).
