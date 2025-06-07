@@ -94,9 +94,35 @@ MIT
 - **Exchange Dropdown:** You can now select between NSE and NASDAQ stocks directly in the search bar for more accurate results and suggestions.
 - **Response Method Selection:** Choose between OpenRouter AI and Serper (Google) as the response provider, blended into the search bar for convenience.
 - **Robust AI Fallback:** If OpenRouter/DeepSeek cannot provide a summary, the backend will automatically try Serper (Google) to ensure you always get a real, fact-based summary for any valid stock.
-- **Terminal Logging:** The backend logs which AI or API (OpenRouter, Serper) provided the response for each request.
+- **Terminal Logging:** The backend logs which AI or API (OpenRouter, Serper) provided the response for each request.Sports accuracy. 
+Listen. 
 - **Input Trimming:** Extra spaces in stock names are automatically removed before processing.
 - **Security:** API keys (including Serper) are never pushed to the repo and must be set in `.env.local` (which is gitignored).
 - **Bug Fixes:** Prevented runtime errors when no news is found by providing safe defaults for all result fields.
+
+
+## How Did I Solve It?
+
+Building this wasn’t easy:
+
+- **Filtering Noise and Duplicates:**  
+  I used a unified, deduplicated stock list from both NSE and NASDAQ, ensuring only real, valid companies are searchable. Fuzzy matching helps correct typos, but only for actual stocks.
+
+- **Preventing AI Hallucinations:**  
+  I layered AI models—first using DeepSeek/OpenRouter for news-based analysis, then falling back to Serper (Google) if no summary is available. This ensures every response is grounded in real, factual data, not AI guesses.
+
+- **Handling Stocks With Little or No News:**  
+  If a stock has no current news, the system prompts the AI for a general company/sector analysis, so users always get a meaningful response instead of an error or hallucinated news.
+
+- **Securing API Keys:**  
+  All API keys are stored in `.env.local` and never exposed to the frontend. All AI and data calls are made server-side, keeping your credentials safe.
+
+- **Managing API Rate Limits and Latency:**  
+  The backend is optimized to quickly select the best available data source, log which provider was used, and gracefully handle slow or failed responses—ensuring speed and reliability.
+
+---
+
+**In summary:**  
+By combining robust validation, layered AI fallbacks, secure server-side logic, and a clean user experience, Stock Signal AI delivers actionable, trustworthy signals for any real stock—no matter the news cycle.
 
 For any issues, contact [Aditya Jadhav](https://www.linkedin.com/in/aditya-jadhav-coder/).

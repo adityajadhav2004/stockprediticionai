@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
+import allStocksRaw from "@/public/all_stocks.json";
 
 // Define the structure of news API response
 interface NewsApiResponse {
@@ -22,6 +23,23 @@ interface OpenRouterResponse {
   }>
 }
 
+// Mapping of common stock names to their official ticker symbols
+const STOCK_TICKER_MAP: Record<string, string> = {
+  "tata motors": "TATAMOTORS.NS",
+  "reliance industries": "RELIANCE.NS",
+  "infosys": "INFY.NS",
+  "hdfc bank": "HDFCBANK.NS",
+  // Add more mappings as needed
+}
+
+// Patch for all_stocks.json NSE tickers: if symbol is NSE and does not end with .NS, add .NS
+const allStocks = (allStocksRaw as any[]).map(stock => {
+  if (stock.exchange === "NSE" && stock.symbol && !stock.symbol.endsWith(".NS")) {
+    return { ...stock, symbol: stock.symbol + ".NS" };
+  }
+  return stock;
+});
+
 export async function GET(request: NextRequest) {
   try {
     // Get stock name from query parameters
@@ -32,7 +50,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Stock name is required" }, { status: 400 })
     }
 
-    stockName = stockName.trim();
+    stockName = stockName.trim().toLowerCase();
+    const ticker = STOCK_TICKER_MAP[stockName] || stockName.toUpperCase();
 
     // Check if we have the required API keys
     const newsApiKey = process.env.NEWS_API_KEY
@@ -42,15 +61,20 @@ export async function GET(request: NextRequest) {
     if (!newsApiKey || !openRouterApiKey) {
       console.log("Missing API key(s), using mock data instead")
       // Redirect to the mock API
-      return getMockStockInsight(stockName)
+      return getMockStockInsight(ticker)
     }
 
     // Fetch news about the stock with more specific query
-    const newsData = await fetchNewsData(stockName)
-
-    // Filter news to ensure relevance to the stock
-    const filteredArticles = filterRelevantNews(newsData.articles, stockName)
-
+    let newsData = await fetchNewsData(ticker)
+    let filteredArticles = filterRelevantNews(newsData.articles, stockName)
+    // If no news found, try fetching with company name from allStocks
+    if (!filteredArticles.length) {
+      const stockEntry = allStocks.find(s => s.symbol.toLowerCase() === ticker.toLowerCase())
+      if (stockEntry && stockEntry.name) {
+        newsData = await fetchNewsData(stockEntry.name)
+        filteredArticles = filterRelevantNews(newsData.articles, stockEntry.name)
+      }
+    }
     // Prepare news for AI analysis
     const newsArticles = filteredArticles.slice(0, 5) // Limit to 5 articles
 
@@ -69,7 +93,7 @@ URL: ${article.url}
     // Analyze news with OpenRouter
     let analysisResult, parsedResult, responder = "openrouter";
     try {
-      analysisResult = await analyzeNewsWithAI(stockName, formattedNews)
+      analysisResult = await analyzeNewsWithAI(ticker, formattedNews)
       parsedResult = parseAIResponse(analysisResult)
     } catch (e) {
       responder = "openrouter-error"
@@ -77,40 +101,76 @@ URL: ${article.url}
     }
 
     // If summary is missing or generic, try fallbacks
-    if (!parsedResult.summary || parsedResult.summary.includes('Unable to generate summary') || parsedResult.summary.includes('No summary')) {
-      // Try Serper
-      let fallbackSummary = await fetchSerperSummary(stockName);
-      if (fallbackSummary) {
-        responder = "serper";
+    let summary = parsedResult.summary;
+    // Special handling: if the original user input (stockName) contains a space, always use Serper first
+    if (stockName.includes(" ")) {
+      const serperSummary = await fetchSerperSummary(`${ticker} stock news`);
+      summary = serperSummary || "";
+      responder = "serper";
+      // If Serper fails, try OpenRouter fallback
+      if (!summary || summary.trim() === "") {
+        try {
+          const fallbackPrompt = `Summarize the following news articles about ${ticker} in 2-3 sentences. Only use the information in the articles.\n\n${formattedNews}`;
+          const fallbackResult = await analyzeNewsWithAI(ticker, fallbackPrompt, true);
+          summary = fallbackResult && fallbackResult.trim() !== "" ? fallbackResult : "";
+          responder = "openrouter-fallback";
+        } catch (e) {
+          // If even fallback fails, leave summary blank
+        }
       }
-      if (!fallbackSummary) {
-        // Try Alpha Vantage (try symbol if available)
-        const symbol = stockName.toUpperCase();
-        fallbackSummary = await fetchAlphaVantageSummary(symbol);
-        if (fallbackSummary) responder = "alphavantage";
+    } else if (!summary || summary.trim() === "" || summary.includes("Unable to generate summary") || summary.includes("No summary")) {
+      // Fallback to Serper (Google) for all other cases
+      const serperSummary = await fetchSerperSummary(`${ticker} stock news`);
+      summary = serperSummary || "";
+      responder = "serper";
+      // If Serper also fails, try to re-feed the news directly to DeepSeek/OpenRouter with a simplified prompt
+      if (!summary || summary.trim() === "") {
+        try {
+          const fallbackPrompt = `Summarize the following news articles about ${ticker} in 2-3 sentences. Only use the information in the articles.\n\n${formattedNews}`;
+          const fallbackResult = await analyzeNewsWithAI(ticker, fallbackPrompt, true);
+          summary = fallbackResult && fallbackResult.trim() !== "" ? fallbackResult : "";
+          responder = "openrouter-fallback";
+        } catch (e) {
+          // If even fallback fails, leave summary blank
+        }
       }
-      if (!fallbackSummary) {
-        // Try Finnhub
-        const symbol = stockName.toUpperCase();
-        fallbackSummary = await fetchFinnhubSummary(symbol);
-        if (fallbackSummary) responder = "finnhub";
-      }
-      if (fallbackSummary) {
-        parsedResult.summary = fallbackSummary;
-        parsedResult.signalType = 'General Company Info';
-        parsedResult.impact = 'Neutral';
+    }
+    if (!summary || summary.trim() === "") {
+      // Try AlphaVantage fallback
+      let altSummary = await fetchAlphaVantageSummary(ticker);
+      if (altSummary && altSummary.trim() !== "") {
+        summary = altSummary;
+        responder = "alphavantage";
       } else {
-        parsedResult.summary = 'No data available for this stock at the moment.';
-        parsedResult.signalType = 'Unknown';
-        parsedResult.impact = 'Neutral';
-        responder = "none";
+        // Try Finnhub fallback
+        altSummary = await fetchFinnhubSummary(ticker);
+        if (altSummary && altSummary.trim() !== "") {
+          summary = altSummary;
+          responder = "finnhub";
+        } else {
+          summary = "No data available for this stock at the moment.";
+          responder = "none";
+        }
       }
     }
     console.log(`[StockSignalAI] Response provider: ${responder}`);
+    console.log(`[StockSignalAI] Response:`, JSON.stringify({
+      ...parsedResult,
+      summary,
+      stockName: ticker,
+      news: newsArticles.map((article) => ({
+        title: article.title,
+        url: article.url,
+        source: article.source,
+        publishedAt: article.publishedAt,
+      })),
+      responder,
+    }, null, 2));
     // Return the final result with news sources
     return NextResponse.json({
       ...parsedResult,
-      stockName: stockName,
+      summary,
+      stockName: ticker,
       news: newsArticles.map((article) => ({
         title: article.title,
         url: article.url,
@@ -295,9 +355,7 @@ function parseAIResponse(aiResponse: string): {
     // Extract JSON from the response (in case the AI included other text)
     const jsonMatch = aiResponse.match(/\{[\s\S]*\}/)
     const jsonStr = jsonMatch ? jsonMatch[0] : aiResponse
-
     const parsed = JSON.parse(jsonStr)
-
     return {
       summary: parsed.summary || "No summary available",
       signalType: parsed.signalType || "Unknown",
@@ -311,12 +369,9 @@ function parseAIResponse(aiResponse: string): {
       relevanceScore: parsed.relevanceScore || 0,
     }
   } catch (error) {
-    console.error("Error parsing AI response:", error)
-    console.log("Raw AI response:", aiResponse)
-
-    // Return default values if parsing fails
+    // If parsing fails, return empty summary so fallback logic triggers
     return {
-      summary: "Unable to generate summary from AI response",
+      summary: "",
       signalType: "Unknown",
       impact: "Neutral",
       buyAnalysis: "No buy analysis available",
@@ -334,10 +389,11 @@ function parseAIResponse(aiResponse: string): {
 async function fetchSerperSummary(stockName: string): Promise<string | null> {
   const apiKey = process.env.SERPER_API_KEY
   if (!apiKey) return null
+  // Use the ticker and a more specific query for better results
   const res = await fetch("https://google.serper.dev/search", {
     method: "POST",
     headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
-    body: JSON.stringify({ q: stockName + " company profile" }),
+    body: JSON.stringify({ q: stockName + " stock news" }),
   })
   if (!res.ok) return null
   const data = await res.json()
