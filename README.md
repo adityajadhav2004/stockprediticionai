@@ -89,40 +89,78 @@ MIT
 
 ---
 
-## Recent Updates (June 2025)
+# Stock Signal AI – Robust Stock Search & Analysis
 
-- **Exchange Dropdown:** You can now select between NSE and NASDAQ stocks directly in the search bar for more accurate results and suggestions.
-- **Response Method Selection:** Choose between OpenRouter AI and Serper (Google) as the response provider, blended into the search bar for convenience.
-- **Robust AI Fallback:** If OpenRouter/DeepSeek cannot provide a summary, the backend will automatically try Serper (Google) to ensure you always get a real, fact-based summary for any valid stock.
-- **Terminal Logging:** The backend logs which AI or API (OpenRouter, Serper) provided the response for each request.Sports accuracy. 
-Listen. 
-- **Input Trimming:** Extra spaces in stock names are automatically removed before processing.
-- **Security:** API keys (including Serper) are never pushed to the repo and must be set in `.env.local` (which is gitignored).
-- **Bug Fixes:** Prevented runtime errors when no news is found by providing safe defaults for all result fields.
+## Features
 
+- **Accurate Stock Search:**
+  - Supports both ticker and company name (e.g., "Tata Motors" or "TATAMOTORS.NS").
+  - Fuzzy matching and typo correction for real stocks only.
+  - Exchange and response method dropdowns in the UI.
+- **Robust News & Analysis:**
+  - Fetches news using ticker; if no news, retries with company name.
+  - Feeds news to OpenRouter/DeepSeek for actionable AI analysis.
+  - If OpenRouter fails or returns blank, falls back to Serper (Google), then OpenRouter summary, then AlphaVantage, then Finnhub.
+  - Never returns a blank summary—always provides a company profile or a clear fallback message.
+  - Logs the full response and provider to the terminal for every request.
+- **Security:**
+  - API keys are never exposed to the frontend or committed to the repo.
+  - `.env.local` is gitignored and must be set up locally.
+- **Stock List:**
+  - Full, deduplicated, validated NASDAQ and NSE stock list from CSVs.
+  - NSE tickers are auto-patched to include `.NS` for compatibility.
+- **User Experience:**
+  - Clear error and fallback messages for all edge cases.
+  - Modern, user-friendly UI.
 
-## How Did I Solve It?
+## How It Works
 
-Building this wasn’t easy:
+1. **User searches for a stock** (by name or ticker).
+2. **Backend validates** the input and finds the correct ticker.
+3. **News is fetched** using the ticker. If no news, tries company name.
+4. **AI analysis** is performed on the news. If blank, falls back to Serper, then OpenRouter summary, then AlphaVantage, then Finnhub.
+5. **Never blank:** If all else fails, a clear message is shown.
+6. **Terminal logs** show the full response and which provider was used.
 
-- **Filtering Noise and Duplicates:**  
-  I used a unified, deduplicated stock list from both NSE and NASDAQ, ensuring only real, valid companies are searchable. Fuzzy matching helps correct typos, but only for actual stocks.
+## Security: API Keys
 
-- **Preventing AI Hallucinations:**  
-  I layered AI models—first using DeepSeek/OpenRouter for news-based analysis, then falling back to Serper (Google) if no summary is available. This ensures every response is grounded in real, factual data, not AI guesses.
+- **Never commit your API keys!**
+- All API keys must be set in `.env.local` (which is gitignored):
 
-- **Handling Stocks With Little or No News:**  
-  If a stock has no current news, the system prompts the AI for a general company/sector analysis, so users always get a meaningful response instead of an error or hallucinated news.
+```
+OPENROUTER_API_KEY=your_openrouter_key
+NEWS_API_KEY=your_newsapi_key
+FINNHUB_API_KEY=your_finnhub_key
+ALPHA_VANTAGE_KEY=your_alphavantage_key
+SERPER_API_KEY=your_serper_key
+```
 
-- **Securing API Keys:**  
-  All API keys are stored in `.env.local` and never exposed to the frontend. All AI and data calls are made server-side, keeping your credentials safe.
+- If you see any API keys in the repo, **remove them immediately** and rotate the keys.
 
-- **Managing API Rate Limits and Latency:**  
-  The backend is optimized to quickly select the best available data source, log which provider was used, and gracefully handle slow or failed responses—ensuring speed and reliability.
+## Setup
+
+1. Clone the repo.
+2. Run `pnpm install` (or `npm install`).
+3. Add your API keys to `.env.local` (see above).
+4. Start the dev server: `pnpm dev` (or `npm run dev`).
+
+## File Structure
+
+- `components/stock-search.tsx` – Search bar, dropdowns, validation, fuzzy matching.
+- `app/api/stock-insight/route.ts` – API endpoint, fallback logic, provider logging.
+- `public/all_stocks.json` – Full validated stock list.
+- `scripts/generate-stock-list.js` – CSV parsing and stock list generation.
+- `stockdata/nasdaq_ticker.csv`, `nse_ticker.csv` – Raw stock data.
+
+## Changelog (Latest)
+
+- Robust fallback: If no news for ticker, fetches with company name.
+- NSE tickers in all_stocks.json are auto-patched to include `.NS`.
+- Multi-level fallback: OpenRouter → Serper → OpenRouter summary → AlphaVantage → Finnhub → never blank.
+- Full API response is logged to the terminal for debugging.
+- API keys are never exposed or committed.
+- README and code are up to date and robust.
 
 ---
 
-**In summary:**  
-By combining robust validation, layered AI fallbacks, secure server-side logic, and a clean user experience, Stock Signal AI delivers actionable, trustworthy signals for any real stock—no matter the news cycle.
-
-For any issues, contact [Aditya Jadhav](https://www.linkedin.com/in/aditya-jadhav-coder/).
+**For any issues, check the terminal logs for the full backend response and provider chain.**
