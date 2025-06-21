@@ -39,6 +39,8 @@ yarn install
 # or
 pnpm install
 ```
+### Live Link
+[Website Link](https://predictstock.netlify.app/)
 
 ### 3. Configure Environment Variables
 Create a `.env.local` file in the root directory:
